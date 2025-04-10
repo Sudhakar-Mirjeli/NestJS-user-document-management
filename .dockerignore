@@ -1,0 +1,26 @@
+# Node modules
+node_modules
+
+# Logs
+logs
+
+# Build output
+dist
+build
+
+# Environment variables
+.env
+.env.*.local
+
+# Docker files
+Dockerfile
+Dockerfile.*
+
+# IDE files
+.idea
+.vscode
+*.swp
+
+# OS generated files
+.DS_Store
+Thumbs.db
