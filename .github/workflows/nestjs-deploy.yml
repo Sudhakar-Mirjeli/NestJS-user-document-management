@@ -1,44 +1,44 @@
-name: Deploy NestJs to EC2
+name: Deploy NestJs to EC2 with Docker Compose
 
 on:
   push:
     branches:
-      - main  # Trigger deployment on push to the main branch
+      - main
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest  # Use the latest Ubuntu runner
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3  # Check out the repository code
+        uses: actions/checkout@v3
 
-      - name: Set up Docker
-        uses: docker/setup-buildx-action@v2  # Set up Docker Buildx for building images
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-      - name: Build Docker image
-        run: docker build -t nestjs-app .  # Build the Docker image with the tag 'nestjs-app'
+      - name: Create app archive
+        run: tar -czf app.tar.gz .
 
-      - name: Save image as tar file
-        run: docker save nestjs-app > nestjs-app.tar  # Save the Docker image as a tar file
-
-      - name: Copy image to EC2
+      - name: Copy app to EC2
         uses: appleboy/scp-action@v0.1.4
         with:
-          host: ${{ secrets.EC2_HOST }}  # EC2 host IP address from GitHub Secrets
+          host: ${{ secrets.EC2_HOST }}
           username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}  # Your EC2 SSH private key from Secrets
-          source: 'nestjs-app.tar'
-          target: '/home/ubuntu'
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "app.tar.gz"
+          target: "/home/ubuntu"
 
-      - name: SSH into EC2 and run container
+      - name: Deploy on EC2
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            sudo docker load < nestjs-app.tar
-            sudo docker stop nestjs-app || true
-            sudo docker rm nestjs-app || true
-            sudo docker run -d -p 3000:3000 --name nestjs-app nestjs-app
+            cd ~/NestJS-user-document-management || mkdir -p ~/NestJS-user-document-management && cd ~/NestJS-user-document-management
+            rm -rf ./*
+            tar -xzf ~/app.tar.gz -C ~/NestJS-user-document-management
+            cd ~/NestJS-user-document-management
+
+            sudo docker-compose down
+            sudo docker-compose up -d --build
