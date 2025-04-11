@@ -1,7 +1,6 @@
-**User Management**, **Document Management**, and **JWT-based Authentication**.
+**User Management**, **Document Management**, and **JWT-Role based Authentication**.
 
 ---
-
 ## 📘 Project: User Document Management System (NestJS)
 
 ### 🧰 Tech Stack
@@ -13,6 +12,21 @@
 - **Storage:** AWS S3 for file uploads
 
 ---
+
+**Local Development Setup**
+1. Clone the Repository
+   git clone [https://github.com/Sudhakar-Mirjeli/NestJS-user-document-management.git]\
+   cd project-name
+
+2. Install Dependencies
+   npm install
+
+3. Create .env File
+4. Run the App
+5. Access the API
+
+Visit: http://localhost:3000/api
+
 
 ## 📁 Project Structure
 ```
@@ -40,7 +54,7 @@ src/
 ├── config/             # Configuration files
 │   └── database.config.ts
 
-├── ingestion/          # Ingestion  for docs.
+├── ingestion/          # Ingestion for docs.
 │   ├── ingestion.controller.ts
 │   └── ingestion.service.ts
 |   |-─ ingestion.module.ts
@@ -49,8 +63,9 @@ src/
 ├── app.module.ts
 └── main.ts
 ```
-
 ---
+
+🚀 **Features**
 
 ## 🔐 Authentication (JWT)
 - Users log in and receive a JWT token.
@@ -59,21 +74,30 @@ src/
 
 ---
 
-## 👤 User Management
-- `POST /auth/register`: Create new user
-- `POST /auth/login`: Login and receive JWT token
+## 👤 Auth Management
+- `POST /auth/register`: Create new user.
+- `POST /auth/login`: Login and receive JWT token.
+- `POST /auth/logout`: Logout the currently logged-in user..
 
-
-**User Entity Sample**
+## 👤 User Management (only 'admin' role user can have access)
+- `GET /users`: Get all users.
+- `GET /users/:id`: Get specific user by id.
+- `GET /users/find`: Get specific user by email id.
+- `PUT /users/:id`: Update specific user.
+- `DELETE /users/:id`: Delete a user.
 
 
 ## 📄 Document Management
-- `POST /documents/upload`: Upload a document with a file (Protected)
-- `GET /documents`: Get all documents (Protected)
-- `GET /documents/:id`: Get specific document
-- `DELETE /documents/:id`: Delete a document (Protected)
+- `POST /documents`: Add a document with a file. (The file will be stored in Amazon S3, and document url will be saved in PostgreSQL)
+- `GET /documents`: Get all documents.
+- `GET /documents/:id`: Get specific document.
+- `PUT /documents/:id`: Update specific document by only ('admin', 'editor') roles.
+- `DELETE /documents/:id`: Delete a document by only ('admin') role.
 
-**Document Entity Sample**
+## 📄 Ingestion Management
+- `POST /ingestion/trigger`: Triggers the ingestion process for a given document ID.
+- `GET /ingestion/status/:id`: Retrieves the ingestion status for a specific ID.
+- `GET /ingestion/history`: Fetches the ingestion history.
 
 ---
 ## ⚙️ Environment Configuration (`.env`)
@@ -94,53 +118,123 @@ AWS_BUCKET_NAME=your_bucket
 ## 🐳 Docker Deployment
 
 **Dockerfile**
-```dockerfile
-FROM node:18-alpine
+```# Base image
+FROM node:20-alpine
+
+# Set working directory
 WORKDIR /app
+
+# Copy package.json and package-lock.json
 COPY package*.json ./
-RUN npm install
+
+# Install dependencies
+RUN npm install --production
+
+# Install Nest CLI globally
+RUN npm install -g @nestjs/cli
+
+# Copy the rest of the application files
 COPY . .
+
+# Build the application
 RUN npm run build
-CMD ["node", "dist/main"]
+
+# Expose the application port
+EXPOSE 3000
+
+# Start the application
+CMD ["npm", "run", "start:prod"]
 ```
 
 **docker-compose.yml**
 
+```
+version: '3.8'
 
-## 🚀 CI/CD (Optional GitHub Actions Sample)
+services:
+  nestjs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nestjs-backend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+    environment:
+      DB_HOST=postgres
+      DB_PORT=5432
+      DB_USERNAME=your_db_user
+      DB_PASSWORD=your_db_password
+      DB_NAME=your_db_name
+
+  postgres:
+    image: postgres:17
+    container_name: postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: your_db_user
+      POSTGRES_PASSWORD: your_db_password
+      POSTGRES_DB: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+
+```
+
+
+## 🚀 CI/CD (GitHub Actions Sample)
 
 **.github/workflows/deploy.yml**
-```yaml
-name: Build and Deploy
+
+```
+name: Deploy NestJs to EC2
 
 on:
   push:
     branches:
-      - main
+      - main  # Trigger deployment on push to the main branch
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  deploy:
+    runs-on: ubuntu-latest  # Use the latest Ubuntu runner
 
     steps:
-    - uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v3  # Check out the repository code
+      
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2  # Set up Docker Buildx for building images
 
-    - name: Set up Node
-      uses: actions/setup-node@v2
-      with:
-        node-version: 18
+      - name: Build Docker image
+        run: docker build -t nestjs-app .  # Build the Docker image with the tag 'nestjs-app'
+      
+      - name: Save image as tar file
+        run: docker save nestjs-app > nestjs-app.tar  # Save the Docker image as a tar file
 
-    - name: Install dependencies
-      run: npm install
+      - name: Copy image to EC2
+        uses: appleboy/scp-action@v0.1.4  # Use SCP action to copy the tar file to the EC2 instance
+        with:
+          host: ${{secrets.EC2_HOST}}  # EC2 host address from secrets
+          username: ubuntu  # EC2 username
+          key: ${{secrets.EC2_SSH_KEY}}  # SSH private key from secrets
+          source: 'nestjs-app.tar'  # Source file to copy
+          target: "/home/ubuntu"  # Target directory on EC2
+      
+      - name: SSH into EC2 and run container
+        uses: appleboy/ssh-action@v1.0.0  # Use SSH action to execute commands on the EC2 instance
+        with:
+          host: ${{ secrets.EC2_HOST }}  # EC2 host address from secrets
+          username: ubuntu  # EC2 username
+          key: ${{ secrets.EC2_SSH_KEY }}  # SSH private key from secrets
+          script: |
+            docker load < nestjs-app.tar  # Load the Docker image from the tar file
+            docker stop nestjs-app || true && docker rm nestjs-app || true  # Stop and remove any existing container
+            docker run -d -p 3000:3000 --name nestjs-app nestjs-app  # Run the container on port 3000
 
-    - name: Build
-      run: npm run build
-
-    - name: Docker build & push (example)
-      run: |
-        docker build -t your-image-name .
-        docker tag your-image-name your-dockerhub-username/your-image-name
-        echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
-        docker push your-dockerhub-username/your-image-name
 ```
 
