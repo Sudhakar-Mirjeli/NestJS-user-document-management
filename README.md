@@ -27,6 +27,9 @@
 
 Visit: http://localhost:3000/api
 
+Run the Test Cases:
+Run Command: npm test
+
 
 ## 📁 Project Structure
 ```
@@ -62,6 +65,13 @@ src/
 │
 ├── app.module.ts
 └── main.ts
+|
+test/
+│
+├── users/               # Test cases
+│   ├── users.service.spec.ts
+|   documents/               # Test cases
+│   ├── documents.service.spec.ts
 ```
 ---
 
