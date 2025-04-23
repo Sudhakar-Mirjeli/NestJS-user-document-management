@@ -30,7 +30,12 @@ export class DocumentsService {
     // Create a new document with metadata and file upload to S3
     async createDocument(createDocumentDto: Partial<Document>, file: Multer.File, loggedInUser: { userId: number }) {
         try {
-            console.log("userProfile in creating document", loggedInUser);
+
+            if (!file) {
+                console.log("No file provided for document creation.");
+                throw new Error('File is required to create a document');
+            }
+
             let documentUrl = '';
             if (file) documentUrl = await this.uploadToS3(file);
 
